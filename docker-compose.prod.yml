@@ -1,0 +1,84 @@
+# Ridngo (ride-and-go) backend — hexagonal WebFlux, ridngo.yowyob.com/ride-api.
+# Autonome (Postgres schéma ride_and_go + Redis privés, Kafka mutualisé).
+services:
+  ridngo-backend:
+    image: "${APP_IMAGE:?APP_IMAGE requis}"
+    container_name: ridngo-backend
+    pull_policy: always
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      SERVER_PORT: "8080"
+      SERVER_FORWARD_HEADERS_STRATEGY: "framework"
+      DB_HOST: "ridngo-db"
+      DB_PORT: "5432"
+      DB_NAME: "yowyob_db"
+      DB_USERNAME: "ridngo"
+      DB_PASSWORD: "${RIDNGO_DB_PASSWORD:?RIDNGO_DB_PASSWORD requis dans .env}"
+      KAFKA_HOST: "yowyob-shared-kafka"
+      KAFKA_PORT: "9092"
+      REDIS_HOST: "ridngo-redis"
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ""
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ >/dev/null 2>&1 || wget -qO- http://localhost:8080/actuator/health >/dev/null 2>&1; [ $? -lt 8 ] && exit 0 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    logging: { driver: "json-file", options: { max-size: "50m", max-file: "5" } }
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ridngo-api.rule=Host(`ridngo.yowyob.com`) && PathPrefix(`/ride-api`)"
+      - "traefik.http.routers.ridngo-api.entrypoints=websecure"
+      - "traefik.http.routers.ridngo-api.tls=true"
+      - "traefik.http.routers.ridngo-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ridngo-api.priority=100"
+      - "traefik.http.middlewares.ridngo-api-strip.stripprefix.prefixes=/ride-api"
+      - "traefik.http.routers.ridngo-api.middlewares=ridngo-api-strip"
+      - "traefik.http.services.ridngo-api.loadbalancer.server.port=8080"
+      - "traefik.docker.network=yowyob"
+    depends_on:
+      ridngo-db: { condition: service_healthy }
+      ridngo-redis: { condition: service_healthy }
+      ridngo-initschema: { condition: service_completed_successfully }
+    networks: [yowyob, ridngo-net]
+  ridngo-initschema:
+    image: postgres:16-alpine
+    restart: on-failure
+    depends_on:
+      ridngo-db: { condition: service_healthy }
+    environment:
+      PGPASSWORD: "${RIDNGO_DB_PASSWORD:?RIDNGO_DB_PASSWORD requis dans .env}"
+    entrypoint: ["sh","-c","psql -h ridngo-db -U ridngo -d yowyob_db -c 'CREATE SCHEMA IF NOT EXISTS ride_and_go'"]
+    networks: [ridngo-net]
+  ridngo-db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: ridngo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "yowyob_db"
+      POSTGRES_USER: "ridngo"
+      POSTGRES_PASSWORD: "${RIDNGO_DB_PASSWORD:?RIDNGO_DB_PASSWORD requis dans .env}"
+    volumes:
+      - ridngo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ridngo -d yowyob_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [ridngo-net]
+  ridngo-redis:
+    image: redis:7-alpine
+    container_name: ridngo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [ridngo-redis-data:/data]
+    healthcheck: { test: ["CMD","redis-cli","ping"], interval: 10s, timeout: 5s, retries: 5 }
+    networks: [ridngo-net]
+volumes:
+  ridngo-db-data:
+  ridngo-redis-data:
+networks:
+  yowyob: { external: true, name: yowyob }
+  ridngo-net: { name: ridngo-net }

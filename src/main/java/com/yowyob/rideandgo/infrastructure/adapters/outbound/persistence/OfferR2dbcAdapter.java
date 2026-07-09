@@ -10,14 +10,21 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.OfferAgreementR2dbcRepository;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.OfferR2dbcRepository;
 import com.yowyob.rideandgo.infrastructure.mappers.OfferMapper;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -141,15 +148,14 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
     }
 
     @Override
-    public Mono<Boolean> deleteBid(UUID offerId, UUID driverId) {
-        return offerAgreementRepository.findByOfferIdAndDriverId(offerId, driverId)
-                .flatMap(offerAgreementRepository::delete)
-                .thenReturn(true)
-                .defaultIfEmpty(false);
+    public Mono<Boolean> exists(Offer offer) {
+        return offerRepository.existsById(offer.id());
     }
 
     @Override
-    public Mono<Boolean> exists(Offer offer) {
-        return offerRepository.existsById(offer.id());
+    public Mono<Boolean> deleteBid(UUID offerId, UUID driverId) {
+        return offerAgreementRepository.findByOfferIdAndDriverId(offerId, driverId)
+                .flatMap(agreement -> offerAgreementRepository.delete(agreement).thenReturn(true))
+                .defaultIfEmpty(false);
     }
 }

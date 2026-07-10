@@ -15,6 +15,15 @@ services:
       DB_NAME: "yowyob_db"
       DB_USERNAME: "ridngo"
       DB_PASSWORD: "${RIDNGO_DB_PASSWORD:?RIDNGO_DB_PASSWORD requis dans .env}"
+      DB_LIQUIBASE_USERNAME: "ridngo"
+      DB_LIQUIBASE_PASSWORD: "${RIDNGO_DB_PASSWORD:?}"
+      DB_SCHEMA: "ride_and_go"
+      REDIS_USERNAME: ""
+      NOTIFICATION_SERVICE_TOKEN: "disabled"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
       KAFKA_HOST: "yowyob-shared-kafka"
       KAFKA_PORT: "9092"
       REDIS_HOST: "ridngo-redis"
@@ -50,6 +59,15 @@ services:
       ridngo-db: { condition: service_healthy }
     environment:
       PGPASSWORD: "${RIDNGO_DB_PASSWORD:?RIDNGO_DB_PASSWORD requis dans .env}"
+      DB_LIQUIBASE_USERNAME: "ridngo"
+      DB_LIQUIBASE_PASSWORD: "${RIDNGO_DB_PASSWORD:?}"
+      DB_SCHEMA: "ride_and_go"
+      REDIS_USERNAME: ""
+      NOTIFICATION_SERVICE_TOKEN: "disabled"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
     entrypoint: ["sh","-c","psql -h ridngo-db -U ridngo -d yowyob_db -c 'CREATE SCHEMA IF NOT EXISTS ride_and_go'"]
     networks: [ridngo-net]
   ridngo-db:
